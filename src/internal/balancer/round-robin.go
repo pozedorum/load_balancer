@@ -4,19 +4,21 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+
+	"github.com/pozedorum/load_balancer/pkg/server"
 )
 
 type RoundRobinBalancer struct {
-	servers []*Server
+	servers []*server.Server
 	current int
 	lock    sync.Mutex
 }
 
-func NewRoundRobinBalancer(servers []*Server) *RoundRobinBalancer {
+func NewRoundRobinBalancer(servers []*server.Server) *RoundRobinBalancer {
 	return &RoundRobinBalancer{servers: servers}
 }
 
-func (b *RoundRobinBalancer) GetNextServer() *Server {
+func (b *RoundRobinBalancer) GetNextServer() *server.Server {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -32,7 +34,7 @@ func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Reques
 }
 
 func main() {
-	servers := createServers(5) // Создание 5 серверов
+	servers := server.CreateServers(5) // Создание 5 серверов
 	balancer := NewRoundRobinBalancer(servers)
 
 	http.HandleFunc("/", balancer.HandleRequest)
