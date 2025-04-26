@@ -57,34 +57,49 @@ func (b *RoundRobinBalancer) GetNextServer() (*server.Server, error) {
 }
 
 // обработка запроса балансировщиком
-func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) error {
+func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) {
+	// Получаем время выполнения из заголовка
 	execTime := r.Header.Get("Execution-Time")
 	if execTime == "" {
 		execTime = "0"
 	}
 
+	// Выбираем сервер
 	server, err := b.GetNextServer()
 	if err != nil {
-		return fmt.Errorf("could not get server: %w", err)
+		http.Error(w, fmt.Sprintf("Could not get server: %v", err), http.StatusServiceUnavailable)
+		return
 	}
 
-	code, err := server.CheckHealth()
-	if err != nil {
-		log.Printf("Server %d health check failed (code %d): %v", server.ID, code, err)
-		return fmt.Errorf("server unavailable")
+	// Проверяем здоровье сервера
+	if _, err := server.CheckHealth(); err != nil {
+		log.Printf("Server %d unavailable: %v", server.ID, err)
+		http.Error(w, fmt.Sprintf("Server %d unavailable", server.ID), http.StatusBadGateway)
+		return
 	}
 
 	log.Printf("Routing request to server %d, task time: %s", server.ID, execTime)
 
-	// Создаем обратный прокси-сервер
+	// Создаем прокси с обработчиком ошибок
 	proxy := &httputil.ReverseProxy{
 		Director: func(r *http.Request) {
 			r.URL.Scheme = "http"
-			r.URL.Host = server.URL[len("http://"):] // Удалить схему и порт
+			r.URL.Host = server.URL[len("http://"):]
+			r.URL.Path = "/process"
 			r.Header.Set("Execution-Time", execTime)
+		},
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Printf("Proxy error (server %d): %v", server.ID, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		},
 	}
 
-	proxy.ServeHTTP(w, r)
-	return nil
+	var wg sync.WaitGroup
+
+	// Запускаем прокси в горутине с контролем контекста
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		proxy.ServeHTTP(w, r)
+	}()
 }

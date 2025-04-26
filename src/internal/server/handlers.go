@@ -35,7 +35,7 @@ func (s *Server) handleProcessTask(w http.ResponseWriter, r *http.Request) {
 	if execTimeStr != "" {
 		execTime, err := strconv.Atoi(execTimeStr)
 		if err != nil {
-			log.Printf("Invalid execution time: %s, error: %w", execTimeStr, err)
+			log.Printf("Invalid execution time: %s, error: %v", execTimeStr, err)
 			http.Error(w, "Invalid execution time", http.StatusBadRequest)
 			return
 		}
@@ -49,11 +49,11 @@ func (s *Server) handleProcessTask(w http.ResponseWriter, r *http.Request) {
 		resp := TaskResponse{
 			ServerID:  s.ID,
 			Delay:     processingTime,
-			Timestamp: time.Now().Format(time.RFC3339Nano),
+			Timestamp: time.Now().Format(time.Millisecond.String()),
 		}
 
 		// Логируем завершение
-		log.Printf("Server %d: Task completed in %v", s.ID, processingTime)
+		log.Printf("Server %d: Task completed in %dms", s.ID, req.DelayMs)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -63,9 +63,12 @@ func (s *Server) handleProcessTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	// log.Printf("Received health check request from %s", r.RemoteAddr)
 	if s.IsHealthy() {
 		w.WriteHeader(http.StatusOK)
+		log.Printf("Server is healthy, returning 200 OK")
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("Server is not healthy, returning 500 Internal Server Error")
 	}
 }

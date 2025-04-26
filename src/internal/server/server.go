@@ -75,6 +75,6 @@ func (s *Server) IsHealthy() bool {
 // Новая функция для обработки задачи
 func (s *Server) ProcessTask(delay time.Duration) time.Duration {
 	// Имитация обработки с случайной задержкой
-	time.Sleep(delay)
+	time.Sleep(delay * time.Millisecond)
 	return delay
 }
