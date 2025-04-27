@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
+const logDir = "logs"
+
 // server - структура для имитации сервера
 type Server struct {
 	ID      int
 	URL     string       // Адрес сервера (например, "http://localhost:8081")
 	Client  *http.Client // HTTP-клиент для health check
+	Logger  *log.Logger  // Логгер
 	mu      sync.RWMutex // Мьютекс для защиты данных
 	Healthy bool         // Флаг здоровья
 }
@@ -29,6 +32,21 @@ func New(port string) *Server {
 		Healthy: true,
 		URL:     fmt.Sprintf("http://localhost:%s", port), // Пример: 8081, 8082, ...
 		Client:  &http.Client{Timeout: 2 * time.Second},
+	}
+}
+
+func NewWithLogger(port string, logger *log.Logger) *Server {
+	id, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatal(fmt.Printf("Error with loading server on port %s, error: %w", port, err))
+	}
+	id -= 8080
+	return &Server{
+		ID:      id,
+		Healthy: true,
+		URL:     fmt.Sprintf("http://localhost:%s", port), // Пример: 8081, 8082, ...
+		Client:  &http.Client{Timeout: 2 * time.Second},
+		Logger:  logger,
 	}
 }
 

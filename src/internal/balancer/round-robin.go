@@ -94,12 +94,6 @@ func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Reques
 		},
 	}
 
-	var wg sync.WaitGroup
-
-	// Запускаем прокси в горутине с контролем контекста
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		proxy.ServeHTTP(w, r)
-	}()
+	// Обрабатываем запрос
+	proxy.ServeHTTP(w, r)
 }

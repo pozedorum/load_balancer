@@ -13,6 +13,8 @@ import (
 	"github.com/pozedorum/load_balancer/internal/server"
 )
 
+var serverLogger *log.Logger
+
 func setupLogger(serverID, port string) *os.File {
 	logDir := "logs"
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
@@ -20,18 +22,20 @@ func setupLogger(serverID, port string) *os.File {
 	}
 
 	logPath := fmt.Sprintf("%s/backend_%s.log", logDir, port)
-
-	// Открываем файл в режиме дописывания (O_APPEND)
 	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}
 
-	// Добавляем разделитель при старте
-	fmt.Fprintf(logFile, "\n\n=== Server %s started at %s ===\n", serverID, time.Now().Format(time.RFC3339))
+	// Инициализируем глобальный логгер с нужным префиксом
+	serverLogger = log.New(logFile, fmt.Sprintf("[Backend %s] ", serverID), log.LstdFlags|log.Lmicroseconds)
 
+	// Перенаправляем стандартный логгер для legacy-кода
 	log.SetOutput(logFile)
 	log.SetPrefix(fmt.Sprintf("[Backend %s] ", serverID))
+
+	fmt.Fprintf(logFile, "\n\n=== Server %s started at %s ===\n", serverID, time.Now().Format(time.RFC3339))
+
 	return logFile
 }
 
@@ -48,11 +52,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Настройка логгера
 	logFile := setupLogger(serverID, port)
 	defer logFile.Close()
 
-	// Обработка сигналов для корректного завершения
+	// Обработка сигналов
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -61,10 +64,11 @@ func main() {
 		os.Exit(0)
 	}()
 
-	srv := server.New(port)
-	log.Printf("Starting on %s", srv.URL)
+	// Создаем сервер с передачей логгера
+	srv := server.NewWithLogger(port, serverLogger)
+	serverLogger.Printf("Starting server on %s", srv.URL)
 
 	http.HandleFunc("/", srv.HandleRequest)
-	log.Printf("Server ready on :%s", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	serverLogger.Printf("Server is ready to accept connections on :%s", port)
+	serverLogger.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
