@@ -15,6 +15,7 @@ import (
 
 func main() {
 	if len(os.Args) < 3 {
+		log.Println("here1")
 		log.Fatal("Usage: go run cmd/backend/main.go <config_file> <server_id>")
 	}
 
@@ -23,12 +24,14 @@ func main() {
 
 	port, err := config.FindPortInConfig(configFile, serverID)
 	if err != nil {
+		log.Println("here2")
 		log.Fatal(err)
 	}
 
 	// Инициализация логгера
 	logger, err := logger.New("backend", serverID, port)
 	if err != nil {
+		log.Println("here3")
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 	defer logger.Close()

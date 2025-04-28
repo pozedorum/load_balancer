@@ -8,14 +8,16 @@ jq -c '.[]' $CONFIG_FILE | while read server; do
     port=$(echo "$server" | jq -r '.port')
     
     echo "Starting server $id on port $port"
-    go run cmd/backend/main.go $CONFIG_FILE $id &
-    sleep 0.3
+    if ! go run cmd/backend/main.go $CONFIG_FILE $id & then
+        echo "Failed to start server $id"
+        exit 1
+    fi
+    sleep 1
 done
 
 # Запускаем балансировщик
 echo "Starting load balancer"
 go run cmd/balancer/main.go
-
 
 # Остановка всех процессов при завершении
 trap "pkill -P $$" EXIT
