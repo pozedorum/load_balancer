@@ -25,12 +25,14 @@ type RoundRobinBalancer struct {
 	current int
 }
 
+// конструктор балансировщика
 func NewRoundRobinBalancer(servers []*server.Server) *RoundRobinBalancer {
 	balancer := &RoundRobinBalancer{servers: servers}
 	go balancer.StartHealthCheck()
 	return balancer
 }
 
+// функция автоматической проверки состояния серверов
 func (b *RoundRobinBalancer) StartHealthCheck() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -42,6 +44,7 @@ func (b *RoundRobinBalancer) StartHealthCheck() {
 	}
 }
 
+// функция получения сервера из списка серверов
 func (b *RoundRobinBalancer) GetNextServer() (*server.Server, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -59,7 +62,6 @@ func (b *RoundRobinBalancer) GetNextServer() (*server.Server, error) {
 }
 
 // обработка запроса балансировщиком
-
 func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	execTime := r.Header.Get("Execution-Time")
 	if execTime == "" {
@@ -115,44 +117,3 @@ func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Reques
 		// log.Printf("Request processed by server %d", server.ID)
 	}()
 }
-
-// func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) {
-// 	// Получаем время выполнения из заголовка
-// 	execTime := r.Header.Get("Execution-Time")
-// 	if execTime == "" {
-// 		execTime = "0"
-// 	}
-
-// 	// Выбираем сервер
-// 	server, err := b.GetNextServer()
-// 	if err != nil {
-// 		http.Error(w, fmt.Sprintf("Could not get server: %v", err), http.StatusServiceUnavailable)
-// 		return
-// 	}
-
-// 	// Проверяем здоровье сервера
-// 	if _, err := server.CheckHealth(); err != nil {
-// 		log.Printf("Server %d unavailable: %v", server.ID, err)
-// 		http.Error(w, fmt.Sprintf("Server %d unavailable", server.ID), http.StatusBadGateway)
-// 		return
-// 	}
-
-// 	log.Printf("Routing request to server %d, task time: %s", server.ID, execTime)
-
-// 	// Создаем прокси с обработчиком ошибок
-// 	proxy := &httputil.ReverseProxy{
-// 		Director: func(r *http.Request) {
-// 			r.URL.Scheme = "http"
-// 			r.URL.Host = server.URL[len("http://"):]
-// 			r.URL.Path = "/process"
-// 			r.Header.Set("Execution-Time", execTime)
-// 		},
-// 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-// 			log.Printf("Proxy error (server %d): %v", server.ID, err)
-// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-// 		},
-// 	}
-
-// 	// Обрабатываем запрос
-// 	proxy.ServeHTTP(w, r)
-// }

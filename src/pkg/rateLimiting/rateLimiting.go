@@ -7,11 +7,11 @@ import (
 
 // Bucket представляет собой bucket токенов для клиента
 type Bucket struct {
-	capacity int // емкость bucket
-	rate     int // скорость пополнения bucket
-	tokens   int // текущее количество токенов в bucket
-	mu       sync.Mutex
-	ticker   *time.Ticker
+	capacity int          // емкость bucket
+	rate     int          // скорость пополнения bucket
+	ticker   *time.Ticker // таймер для автоматического пополнения бакета
+	mu       sync.Mutex   // мьютекс для защитв
+	tokens   int          // текущее количество токенов в bucket
 }
 
 // NewBucket создает новый bucket с заданными настройками

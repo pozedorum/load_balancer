@@ -15,14 +15,15 @@ const logDir = "logs"
 
 // server - структура для имитации сервера
 type Server struct {
-	ID      int
+	ID      int          // Номер сервера в списке серверов балансировщика
 	URL     string       // Адрес сервера (например, "http://localhost:8081")
 	Client  *http.Client // HTTP-клиент для health check
 	Logger  *log.Logger  // Логгер
-	mu      sync.RWMutex // Мьютекс для защиты данных
+	mu      sync.RWMutex // Мьютекс для защиты данных (флага здоровья)
 	Healthy bool         // Флаг здоровья
 }
 
+// Конструктор сервера со стороны балансировщика
 func New(port string) *Server {
 	id, err := strconv.Atoi(port)
 	if err != nil {
@@ -37,6 +38,7 @@ func New(port string) *Server {
 	}
 }
 
+// Конструктор сервера со стороны сервера
 func NewWithLogger(port string, logger *logger.Logger) *Server {
 	id, err := strconv.Atoi(port)
 	if err != nil {
@@ -61,6 +63,7 @@ func CreateServers(count int) []*Server {
 	return servers
 }
 
+// отправка запроса на проверку и обработка ответа
 func (s *Server) CheckHealth() (int, error) {
 	resp, err := s.Client.Get(s.URL + "/health")
 	if err != nil {
@@ -80,6 +83,7 @@ func (s *Server) CheckHealth() (int, error) {
 	return resp.StatusCode, nil
 }
 
+// функция установки статуса с блокировкой данных
 func (s *Server) setHealthy(health bool) {
 	s.mu.Lock() // полная блокировка
 	s.Healthy = health

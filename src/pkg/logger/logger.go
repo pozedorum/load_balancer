@@ -9,8 +9,8 @@ import (
 )
 
 type Logger struct {
-	*log.Logger
-	file *os.File
+	*log.Logger          // библиотечный логгер
+	file        *os.File // путь до файла, куда записываются логи
 }
 
 // New создает новый логгер с записью в файл

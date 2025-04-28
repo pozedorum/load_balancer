@@ -75,6 +75,7 @@ func (s *Server) handleProcessTask(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Проверка состояния сервера и отправка ответа балансировщику
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("Received health check request from %s", r.RemoteAddr)
 	if s.IsHealthy() {
@@ -89,6 +90,7 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	logCounter++
 }
 
+// функция обработки ошибок связанных с execTime в функции handleProcessTask
 func (s *Server) processErrors(w http.ResponseWriter, execTimeStr string) (int, error) {
 	execTime, err := strconv.Atoi(execTimeStr)
 	if err != nil {
