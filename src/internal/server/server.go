@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/pozedorum/load_balancer/pkg/logger"
 )
 
 const logDir = "logs"
@@ -24,7 +26,7 @@ type Server struct {
 func New(port string) *Server {
 	id, err := strconv.Atoi(port)
 	if err != nil {
-		log.Fatal(fmt.Printf("Error with loading server on port %s, error: %w", port, err))
+		log.Fatalf("Error with loading server on port %s, error: %w", port, err)
 	}
 	id -= 8080
 	return &Server{
@@ -35,10 +37,10 @@ func New(port string) *Server {
 	}
 }
 
-func NewWithLogger(port string, logger *log.Logger) *Server {
+func NewWithLogger(port string, logger *logger.Logger) *Server {
 	id, err := strconv.Atoi(port)
 	if err != nil {
-		log.Fatal(fmt.Printf("Error with loading server on port %s, error: %w", port, err))
+		log.Fatalf("Error with loading server on port %s, error: %w", port, err)
 	}
 	id -= 8080
 	return &Server{
@@ -46,7 +48,7 @@ func NewWithLogger(port string, logger *log.Logger) *Server {
 		Healthy: true,
 		URL:     fmt.Sprintf("http://localhost:%s", port), // Пример: 8081, 8082, ...
 		Client:  &http.Client{Timeout: 2 * time.Second},
-		Logger:  logger,
+		Logger:  logger.Logger,
 	}
 }
 

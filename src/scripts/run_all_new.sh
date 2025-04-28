@@ -16,5 +16,6 @@ done
 echo "Starting load balancer"
 go run cmd/balancer/main.go
 
+
 # Остановка всех процессов при завершении
 trap "pkill -P $$" EXIT

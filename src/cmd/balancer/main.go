@@ -9,6 +9,7 @@ import (
 	"github.com/pozedorum/load_balancer/config"
 	"github.com/pozedorum/load_balancer/internal/balancer"
 	"github.com/pozedorum/load_balancer/internal/server"
+	"github.com/pozedorum/load_balancer/pkg/logger"
 )
 
 func main() {
@@ -23,11 +24,19 @@ func main() {
 	}
 
 	lb := balancer.NewRoundRobinBalancer(servers)
-
+	// Инициализация логгера
+	serverID := "0"
+	port := "8080"
+	log.Printf("Load balancer started on :%s", port)
+	logger, err := logger.New("balancer", serverID, port)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
+	logger.SetGlobal()
 	// Упрощенный обработчик без возврата ошибки
 	http.HandleFunc("/", lb.HandleRequest)
 
-	port := 8080
-	log.Printf("Load balancer started on :%d", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	log.Printf("Load balancer started on :%s", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
