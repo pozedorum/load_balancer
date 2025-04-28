@@ -7,10 +7,10 @@ import (
 
 // Client представляет собой клиента с bucket токенов
 type Client struct {
-	ip       string
-	bucket   *Bucket
-	mu       sync.RWMutex
-	lastSeen time.Time
+	ip       string       // адрес клиента
+	bucket   *Bucket      // бакет клиента
+	mu       sync.RWMutex // мьютекс защиты данных (lastSeen)
+	lastSeen time.Time    // время последней активности клиента
 }
 
 // NewClient создает нового клиента с bucket токенов

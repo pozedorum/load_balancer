@@ -7,11 +7,11 @@ import (
 
 // RateLimiter представляет собой модуль rate-limiting
 type RateLimiter struct {
-	clients         map[string]*Client
-	mu              sync.RWMutex
-	cleanupInterval time.Duration // Интервал очистки
-	inactiveTimeout time.Duration // Таймаут неактивности
-	stopChan        chan struct{} // Канал для остановки очистки
+	mu              sync.RWMutex       // мьютекс защиты данных
+	clients         map[string]*Client // список клиентов (в клиентах лежат их бакеты)
+	cleanupInterval time.Duration      // Интервал очистки
+	inactiveTimeout time.Duration      // Таймаут неактивности
+	stopChan        chan struct{}      // Канал для остановки очистки
 }
 
 // NewRateLimiter создает новый модуль rate-limiting
@@ -47,6 +47,7 @@ func (rl *RateLimiter) TakeToken(ip string) bool {
 	return client.TakeToken()
 }
 
+// Возват токена в случае невыполнения запроса (возникла ошибка при выполнении)
 func (r *RateLimiter) ReturnToken(ip string) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -56,6 +57,7 @@ func (r *RateLimiter) ReturnToken(ip string) {
 	}
 }
 
+// Разрешение на взятие токена из бакета (разрешение на выполнение запроса)
 func (r *RateLimiter) Allow(ip string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

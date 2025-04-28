@@ -7,11 +7,13 @@ import (
 	"strconv"
 )
 
+// структура для парсинга конфигов из файла
 type ServerConfig struct {
 	ID   int `json:"id"`
 	Port int `json:"port"`
 }
 
+// Загрузка списка конфигов из файла
 func LoadServerConfigList(path string) ([]ServerConfig, error) {
 	file, err := os.ReadFile(path)
 	if err != nil {
@@ -26,6 +28,7 @@ func LoadServerConfigList(path string) ([]ServerConfig, error) {
 	return configs, nil
 }
 
+// Загрузка конфига для определённого сервера
 func FindPortInConfig(path, serverID string) (string, error) {
 	file, err := os.ReadFile(path)
 	if err != nil {

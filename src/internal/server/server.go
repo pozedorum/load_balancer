@@ -13,9 +13,9 @@ import (
 
 const logDir = "logs"
 
-// server - структура для имитации сервера
+// server - структура сервера
 type Server struct {
-	ID      int
+	ID      int          // Номер сервера в списке серверов балансировщика
 	URL     string       // Адрес сервера (например, "http://localhost:8081")
 	Client  *http.Client // HTTP-клиент для health check
 	Logger  *log.Logger  // Логгер
@@ -23,6 +23,7 @@ type Server struct {
 	Healthy bool         // Флаг здоровья
 }
 
+// Конструктор сервера со стороны балансировщика
 func New(port string) *Server {
 	id, err := strconv.Atoi(port)
 	if err != nil {
@@ -37,6 +38,7 @@ func New(port string) *Server {
 	}
 }
 
+// Конструктор сервера со стороны сервера
 func NewWithLogger(port string, logger *logger.Logger) *Server {
 	id, err := strconv.Atoi(port)
 	if err != nil {
@@ -52,7 +54,7 @@ func NewWithLogger(port string, logger *logger.Logger) *Server {
 	}
 }
 
-// cодание списка серверов
+// cоздание списка серверов
 func CreateServers(count int) []*Server {
 	servers := make([]*Server, 0, count)
 	for i := 1; i <= count; i++ {
@@ -61,6 +63,7 @@ func CreateServers(count int) []*Server {
 	return servers
 }
 
+// отправка запроса на проверку состояния сервера и обработка ответа
 func (s *Server) CheckHealth() (int, error) {
 	resp, err := s.Client.Get(s.URL + "/health")
 	if err != nil {
@@ -80,12 +83,14 @@ func (s *Server) CheckHealth() (int, error) {
 	return resp.StatusCode, nil
 }
 
+// // функция установки статуса с блокировкой данных
 func (s *Server) setHealthy(health bool) {
 	s.mu.Lock() // полная блокировка
 	s.Healthy = health
 	s.mu.Unlock()
 }
 
+// функция проверки состояния здоровья и блокировки только на чтение данных
 func (s *Server) IsHealthy() bool {
 	s.mu.RLock() // блокировка чтения
 	defer s.mu.RUnlock()

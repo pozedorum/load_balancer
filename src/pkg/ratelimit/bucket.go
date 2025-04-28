@@ -7,11 +7,11 @@ import (
 
 // Bucket представляет собой bucket токенов для клиента
 type Bucket struct {
-	capacity int // емкость bucket
-	rate     int // скорость пополнения bucket
-	tokens   int // текущее количество токенов в bucket
-	mu       sync.Mutex
-	ticker   *time.Ticker
+	capacity int          // емкость bucket
+	rate     int          // скорость пополнения bucket
+	ticker   *time.Ticker // таймер автоматического пополнения бакетов
+	mu       sync.Mutex   // мьютекс защищающий данные(токены)
+	tokens   int          // текущее количество токенов в bucket
 }
 
 // NewBucket создает новый bucket с заданными настройками
@@ -52,9 +52,8 @@ func (b *Bucket) TakeToken() bool {
 func (b *Bucket) ReturnToken() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
+	// Не превышаем максимальную емкость
 	if b.tokens < b.capacity {
 		b.tokens++
 	}
-	// Не превышаем максимальную емкость
 }

@@ -21,13 +21,15 @@ var (
 	ErrInvalidResponse  = errors.New("invalid server response")
 )
 
+// структура балансировщика
 type RoundRobinBalancer struct {
-	servers     []*server.Server
-	rateLimiter *ratelimit.RateLimiter
-	lock        sync.Mutex
-	current     int
+	servers     []*server.Server       // список серверов
+	rateLimiter *ratelimit.RateLimiter // ограничитель количества запросов
+	lock        sync.Mutex             // мьютекс блокировки данных
+	current     int                    // текущий сервер выбранный для отправки запроса
 }
 
+// конструктор балансировщика
 func NewRoundRobinBalancer(servers []*server.Server) *RoundRobinBalancer {
 	balancer := &RoundRobinBalancer{
 		servers:     servers,
@@ -37,6 +39,7 @@ func NewRoundRobinBalancer(servers []*server.Server) *RoundRobinBalancer {
 	return balancer
 }
 
+// функция автоматической проверки состояния серверов
 func (b *RoundRobinBalancer) StartHealthCheck() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -48,6 +51,7 @@ func (b *RoundRobinBalancer) StartHealthCheck() {
 	}
 }
 
+// функция получения сервера из списка серверов
 func (b *RoundRobinBalancer) GetNextServer() (*server.Server, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()

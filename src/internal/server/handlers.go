@@ -8,25 +8,16 @@ import (
 	"time"
 )
 
+// вспомогательная структура для создания запросов
 type TaskRequest struct {
 	DelayMs int `json:"delay_ms"`
 }
 
+// структура для отправки запросов на сервера от балансировщика
 type TaskResponse struct {
 	ServerID  int           `json:"server_id"`
 	Delay     time.Duration `json:"delay"`
 	Timestamp string        `json:"timestamp"`
-}
-
-func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path {
-	case "/process":
-		s.handleProcessTask(w, r)
-	case "/health":
-		s.handleHealthCheck(w, r)
-	default:
-		http.NotFound(w, r)
-	}
 }
 
 // Переменные для уменьшения количества логов о состоянии сервера
@@ -41,6 +32,19 @@ var (
 	ErrTooBigNumber   = errors.New("execTime is too big")
 )
 
+// основной хэндлер, отправляющий запросы на специализированные хэндлеры
+func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/process":
+		s.handleProcessTask(w, r)
+	case "/health":
+		s.handleHealthCheck(w, r)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+// хэндлер обработки основной задачи (тестовая задача длится время, передаваемое в запросе)
 func (s *Server) handleProcessTask(w http.ResponseWriter, r *http.Request) {
 	// Получаем значение execTime из заголовка запроса
 	s.mu.Lock()         // Блокируем другие запросы
@@ -75,6 +79,7 @@ func (s *Server) handleProcessTask(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// хэндлер обрабатывающий запрос о состоянии сервера и возвращающий ответ балансировщику
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("Received health check request from %s", r.RemoteAddr)
 	if s.IsHealthy() {
@@ -89,6 +94,8 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	logCounter++
 }
 
+// функция обработки ошибок связанных с неправильным временем выполнения задачи
+// если всё хорошо, отправляет время выполнения, иначе время равно 0 и добавляется ошибка
 func (s *Server) processErrors(w http.ResponseWriter, execTimeStr string) (int, error) {
 	execTime, err := strconv.Atoi(execTimeStr)
 	if err != nil {
