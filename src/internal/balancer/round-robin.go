@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/pozedorum/load_balancer/internal/server"
+	"github.com/pozedorum/load_balancer/pkg/ratelimit"
 )
 
 var (
@@ -20,13 +22,17 @@ var (
 )
 
 type RoundRobinBalancer struct {
-	servers []*server.Server
-	lock    sync.Mutex
-	current int
+	servers     []*server.Server
+	rateLimiter *ratelimit.RateLimiter
+	lock        sync.Mutex
+	current     int
 }
 
 func NewRoundRobinBalancer(servers []*server.Server) *RoundRobinBalancer {
-	balancer := &RoundRobinBalancer{servers: servers}
+	balancer := &RoundRobinBalancer{
+		servers:     servers,
+		rateLimiter: ratelimit.NewRateLimiter(5*time.Minute, 5*time.Minute),
+	}
 	go balancer.StartHealthCheck()
 	return balancer
 }
@@ -61,41 +67,56 @@ func (b *RoundRobinBalancer) GetNextServer() (*server.Server, error) {
 // обработка запроса балансировщиком
 
 func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) {
+	clientIP := strings.Split(r.RemoteAddr, ":")[0]
+	if !b.rateLimiter.TakeToken(clientIP) {
+		log.Printf("request from %s is canceled", clientIP)
+		http.Error(w, "Too many requests", http.StatusTooManyRequests)
+		return
+	}
+	var err error
+	defer func() {
+		if err != nil {
+			b.rateLimiter.ReturnToken(clientIP)
+		}
+	}()
+
 	execTime := r.Header.Get("Execution-Time")
 	if execTime == "" {
 		execTime = "0"
 	}
 
-	server, err := b.GetNextServer()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not get server: %v", err), http.StatusServiceUnavailable)
-		return
-	}
+	// Поиск здорового сервера
+	var server *server.Server
 
-	if _, err := server.CheckHealth(); err != nil {
-		log.Printf("Server %d unavailable: %v", server.ID, err)
-		http.Error(w, fmt.Sprintf("Server %d unavailable", server.ID), http.StatusBadGateway)
+	for range len(b.servers) - 1 {
 		server, err = b.GetNextServer()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Could not get server: %v", err), http.StatusServiceUnavailable)
-			return
+			continue
 		}
+		if _, err = server.CheckHealth(); err == nil {
+			break
+		}
+	}
+	if err != nil {
+		http.Error(w, "No healthy servers available", http.StatusServiceUnavailable)
 		return
 	}
 
 	log.Printf("Routing request to server %d, task time: %s", server.ID, execTime)
 
-	// Сразу отвечаем клиенту, что запрос принят
 	w.WriteHeader(http.StatusAccepted)
 	fmt.Fprintf(w, "Request accepted and being processed by server %d\n", server.ID)
 
-	// Создаем новый контекст без привязки к клиентскому запросу
 	ctx := context.Background()
-
-	// Клонируем запрос с новым контекстом
 	req := r.Clone(ctx)
 
-	// Создаем прокси
+	// Копирование важных заголовков
+	for _, h := range []string{"Accept", "Accept-Encoding", "Content-Type"} {
+		if v := r.Header.Get(h); v != "" {
+			req.Header.Set(h, v)
+		}
+	}
+
 	proxy := &httputil.ReverseProxy{
 		Director: func(r *http.Request) {
 			r.URL.Scheme = "http"
@@ -108,51 +129,13 @@ func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Reques
 		},
 	}
 
-	// Запускаем обработку в горутине
+	// Буферизированный обработчик
+	recorder := httptest.NewRecorder()
 	go func() {
-		// Используем httptest.NewRecorder() как заглушку для ResponseWriter
-		proxy.ServeHTTP(httptest.NewRecorder(), req)
-		// log.Printf("Request processed by server %d", server.ID)
+		proxy.ServeHTTP(recorder, req)
+		if recorder.Code >= 400 {
+			log.Printf("Backend %d response: %d - %s",
+				server.ID, recorder.Code, recorder.Body.String())
+		}
 	}()
 }
-
-// func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) {
-// 	// Получаем время выполнения из заголовка
-// 	execTime := r.Header.Get("Execution-Time")
-// 	if execTime == "" {
-// 		execTime = "0"
-// 	}
-
-// 	// Выбираем сервер
-// 	server, err := b.GetNextServer()
-// 	if err != nil {
-// 		http.Error(w, fmt.Sprintf("Could not get server: %v", err), http.StatusServiceUnavailable)
-// 		return
-// 	}
-
-// 	// Проверяем здоровье сервера
-// 	if _, err := server.CheckHealth(); err != nil {
-// 		log.Printf("Server %d unavailable: %v", server.ID, err)
-// 		http.Error(w, fmt.Sprintf("Server %d unavailable", server.ID), http.StatusBadGateway)
-// 		return
-// 	}
-
-// 	log.Printf("Routing request to server %d, task time: %s", server.ID, execTime)
-
-// 	// Создаем прокси с обработчиком ошибок
-// 	proxy := &httputil.ReverseProxy{
-// 		Director: func(r *http.Request) {
-// 			r.URL.Scheme = "http"
-// 			r.URL.Host = server.URL[len("http://"):]
-// 			r.URL.Path = "/process"
-// 			r.Header.Set("Execution-Time", execTime)
-// 		},
-// 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-// 			log.Printf("Proxy error (server %d): %v", server.ID, err)
-// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-// 		},
-// 	}
-
-// 	// Обрабатываем запрос
-// 	proxy.ServeHTTP(w, r)
-// }

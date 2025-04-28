@@ -2,9 +2,11 @@
 
 # Скрипт для проверки доступности серверов
 TIMEOUT=1  # Таймаут в секундах
-ATTEMPTS=10 # Количество попыток
+ATTEMPTS=15 # Количество попыток
 BALANCER_URL="http://localhost:8080"
 BACKEND_URLS=("http://localhost:8081" "http://localhost:8082" "http://localhost:8083")
+
+
 
 # Функция для проверки URL
 check_url() {
