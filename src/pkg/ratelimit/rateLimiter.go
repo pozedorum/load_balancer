@@ -1,9 +1,14 @@
 package ratelimit
 
 import (
+	"log"
 	"sync"
 	"time"
+
+	"github.com/pozedorum/load_balancer/config"
 )
+
+const RateLimitsConfigPath = "config/rate_limits.json"
 
 // RateLimiter представляет собой модуль rate-limiting
 type RateLimiter struct {
@@ -12,6 +17,8 @@ type RateLimiter struct {
 	cleanupInterval time.Duration      // Интервал очистки
 	inactiveTimeout time.Duration      // Таймаут неактивности
 	stopChan        chan struct{}      // Канал для остановки очистки
+	defaultCapacity int
+	defaultRate     int
 }
 
 // NewRateLimiter создает новый модуль rate-limiting
@@ -21,8 +28,30 @@ func NewRateLimiter(cleanupInterval, inactiveTimeout time.Duration) *RateLimiter
 		cleanupInterval: cleanupInterval,
 		inactiveTimeout: inactiveTimeout,
 		stopChan:        make(chan struct{}),
+		defaultCapacity: 10, // значения по умолчанию
+		defaultRate:     1,
 	}
 	go rl.startCleanup()
+	return rl
+}
+
+func NewRateLimiterWithConfig(cleanupInterval, inactiveTimeout time.Duration) *RateLimiter {
+	rl := NewRateLimiter(cleanupInterval, inactiveTimeout)
+
+	// Загружаем и применяем конфиг
+	if cfg, err := config.LoadRateLimitConfig(RateLimitsConfigPath); err == nil {
+		rl.defaultCapacity = cfg.Default.Capacity
+		rl.defaultRate = cfg.Default.Rate
+
+		// Предварительно создаем клиентов из конфига
+		for ip, clientCfg := range cfg.Clients {
+			rl.clients[ip] = NewClient(ip, clientCfg.Capacity, clientCfg.Rate)
+		}
+	} else {
+		// Логируем ошибку, если конфиг не загрузился
+		log.Printf("Failed to load rate limit config: %v. Using defaults", err)
+	}
+
 	return rl
 }
 
@@ -36,11 +65,14 @@ func (r *RateLimiter) AddClient(ip string, capacity, rate int) {
 // TakeToken извлекает токен из bucket клиента, если он доступен
 func (rl *RateLimiter) TakeToken(ip string) bool {
 	rl.mu.Lock()
+
 	client, exists := rl.clients[ip]
 	if !exists {
-		client = NewClient(ip, 10, 1) // Пример: 10 запросов в секунду
+		// Если клиента нет, создаем с дефолтными настройками
+		client = NewClient(ip, rl.defaultCapacity, rl.defaultRate)
 		rl.clients[ip] = client
 	}
+	// в клиенте свой мьютекс, так что здесь его надо разблокировать
 	rl.mu.Unlock()
 
 	client.UpdateLastSeen()

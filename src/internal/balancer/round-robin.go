@@ -33,7 +33,7 @@ type RoundRobinBalancer struct {
 func NewRoundRobinBalancer(servers []*server.Server) *RoundRobinBalancer {
 	balancer := &RoundRobinBalancer{
 		servers:     servers,
-		rateLimiter: ratelimit.NewRateLimiter(5*time.Minute, 5*time.Minute),
+		rateLimiter: ratelimit.NewRateLimiterWithConfig(5*time.Minute, 5*time.Minute),
 	}
 	go balancer.StartHealthCheck()
 	return balancer
@@ -69,7 +69,6 @@ func (b *RoundRobinBalancer) GetNextServer() (*server.Server, error) {
 }
 
 // обработка запроса балансировщиком
-
 func (b *RoundRobinBalancer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	clientIP := strings.Split(r.RemoteAddr, ":")[0]
 	if !b.rateLimiter.TakeToken(clientIP) {

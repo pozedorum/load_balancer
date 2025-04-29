@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"sync"
 )
 
 // структура для парсинга конфигов из файла
@@ -51,4 +52,43 @@ func FindPortInConfig(path, serverID string) (string, error) {
 	}
 
 	return "", errors.New("no such serverId in config")
+}
+
+type ClientConfig struct {
+	Capacity int `json:"capacity"`
+	Rate     int `json:"rate"`
+}
+
+type RateLimitConfig struct {
+	Default ClientConfig            `json:"default"`
+	Clients map[string]ClientConfig `json:"clients"`
+}
+
+var (
+	rateLimitConfig     *RateLimitConfig
+	rateLimitConfigOnce sync.Once
+)
+
+func LoadRateLimitConfig(RateLimitsConfigPath string) (*RateLimitConfig, error) {
+	var loadErr error
+	rateLimitConfigOnce.Do(func() {
+		file, err := os.Open(RateLimitsConfigPath)
+		if err != nil {
+			loadErr = err
+			return
+		}
+		defer file.Close()
+
+		var cfg RateLimitConfig
+		if err = json.NewDecoder(file).Decode(&cfg); err != nil {
+			loadErr = err
+			return
+		}
+		rateLimitConfig = &cfg
+	})
+	return rateLimitConfig, loadErr
+}
+
+func GetConfig() *RateLimitConfig {
+	return rateLimitConfig
 }
