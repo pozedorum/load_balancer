@@ -1,10 +1,8 @@
 #!/bin/bash
 
-# Базовый порт сервера
-BASE_PORT=8080
-
-# Количество серверов
-NUM_SERVERS=3
+CONFIG_FILE="config/servers.json"
+LOG_DIR="logs"
+PID_FILE="$LOG_DIR/server.pids"
 
 # Функция для отправки запроса на сервер
 send_request() {
@@ -15,10 +13,10 @@ send_request() {
 }
 
 # Проверяем соединение с балансировщиком нагрузки
-send_request $BASE_PORT
+send_request 8080
 
 # Проверяем соединение с каждым сервером
-for ((i=1; i<=NUM_SERVERS; i++)); do
-  port=$((BASE_PORT + i))
+for server in $(jq -c '.[]' $CONFIG_FILE); do
+  port=$(jq -r '.port' <<< "$server")
   send_request $port
 done
